@@ -92,6 +92,48 @@ export default {
                 window.i18n.global.locale.value = locale;
             }
         })();
+
+        (async function () {
+            if (window.pipedConnect) return;
+
+            const newEvent = (event, detail) => new CustomEvent(event, { detail });
+            const newVideoEvent = (event, action, data) => newEvent(event, { action: action.split(".").at(1), data });
+
+            window.pipedConnect = {
+                socket: new window.WebSocket("wss://ntfy.sh/piped-connect-jim3692/ws"),
+                events: new EventTarget(),
+            };
+
+            window.pipedConnect.socket.addEventListener("open", () => {
+                console.log("ntfy connected");
+            });
+            window.pipedConnect.socket.addEventListener("close", () => {
+                console.log("ntfy disconnected");
+            });
+            window.pipedConnect.socket.addEventListener("error", () => {
+                console.log("ntfy failed");
+            });
+            window.pipedConnect.socket.addEventListener("message", ({ data }) => {
+                const { message } = JSON.parse(data);
+                if (!message) return;
+                console.log("ntfy", message);
+                const payload = JSON.parse(message);
+                console.log("ntfy", payload);
+
+                switch (payload.action) {
+                    case "piped.gotoVideo":
+                        App.$router.push(`/watch?v=${payload.data.videoId}`);
+                        break;
+                    case "video.play":
+                    case "video.pause":
+                    case "video.seek":
+                        window.pipedConnect.events.dispatchEvent(
+                            newVideoEvent("playerEvent", payload.action, payload.data),
+                        );
+                        break;
+                }
+            });
+        })();
     },
     methods: {
         setTheme() {

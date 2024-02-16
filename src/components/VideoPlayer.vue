@@ -99,6 +99,11 @@ export default {
         if (!this.$shaka) this.shakaPromise = shaka.then(shaka => shaka.default).then(shaka => (this.$shaka = shaka));
         if (!this.$hotkeys)
             this.hotkeysPromise = hotkeys.then(mod => mod.default).then(hotkeys => (this.$hotkeys = hotkeys));
+        if (!this.$connectHandler && window.pipedConnect)
+            this.$connectHandler = window.pipedConnect.events.addEventListener(
+                "playerEvent",
+                this.handlePipedConnectPlayerEvent,
+            );
     },
     activated() {
         this.destroying = false;
@@ -232,6 +237,22 @@ export default {
         this.destroy(true);
     },
     methods: {
+        handlePipedConnectPlayerEvent({ detail: event }) {
+            console.log("ntfy", event);
+            const videoEl = this.$refs.videoEl;
+            switch (event.action) {
+                case "play":
+                    if (videoEl.paused) videoEl.play();
+                    break;
+                case "pause":
+                    if (!videoEl.paused) videoEl.pause();
+                    break;
+                case "seek":
+                    videoEl.currentTime = event.data.time;
+                    if (videoEl.paused) videoEl.play();
+                    break;
+            }
+        },
         async loadVideo() {
             this.updateSponsors();
 
@@ -786,6 +807,12 @@ export default {
             if (this.$player) {
                 this.$player.destroy();
                 if (!document.pictureInPictureElement) this.$player = undefined;
+            }
+            if (this.$connectHandler) {
+                this.$connectHandler = window.pipedConnect.events.removeEventListener(
+                    "playerEvent",
+                    this.handlePipedConnectPlayerEvent,
+                );
             }
             if (hotkeys) this.$hotkeys?.unbind();
             this.$refs.container?.querySelectorAll("div").forEach(node => node.remove());
